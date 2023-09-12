@@ -2,6 +2,9 @@ const express = require('express')
 const expressLayouts = require('express-ejs-layouts')
 const {loadContact, findContact, addContact, cekDuplikat} = require('./utils/contacts')
 const {body, validationResult, check} = require('express-validator')
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
+const flash = require('connect-flash');
 
 const app = express()
 const port = 3000
@@ -11,6 +14,18 @@ app.use(expressLayouts);
 app.use(express.static('public'));
 // data yang di request dari form  harus di parsing dulu ya
 app.use(express.urlencoded({extended: true})) // built in middleware
+
+// kofigurasi flash
+app.use(cookieParser('secret'));
+app.use(
+    session({
+        cookie: {maxAge: 6000},
+        secret: 'secret',
+        resave: true,
+        saveUninitialized: true,
+    })
+);
+app.use(flash());
 
 app.get('/', (req, res) => {
     // res.sendFile('./index.html',  {root: __dirname})
@@ -50,6 +65,7 @@ app.get('/contact', (req, res) => {
         layout: 'layouts/main-layout',
         title: 'Halaman Contact',
         contacts,
+        msg: req.flash('msg'),
     });
 });
 
@@ -75,15 +91,29 @@ app.post('/contact', [
 ], (req, res) =>{
     const errors = validationResult(req);
     if(!errors.isEmpty()){
-        // return res.status(400).json({errors: errors.array()});
         res.render('add-contact', {
             title: 'Form Tambah Data Contact',
             layout: 'layouts/main-layout',
             errors: errors.array(),
         });
-    };
-    // addContact(req.body);
-    // res.redirect('/contact');
+    } else{
+        addContact(req.body);
+        // kirimkan flash message
+        req.flash('msg', 'Data contact berhasil ditambahkan!');
+        res.redirect('/contact');
+    }
+})
+
+// proses delete contact
+app.get('/contact/delete/:nama', (req, res)=>{
+    const contact = findContact(req.params.nama);
+    // jika contact tidak ada
+    if (!contact) {
+        res.status(404);
+        res.send('<h1>404</h1>')
+    } else {
+        deleteContact(req.params.nama)
+    }
 })
 
 app.get('/contact/:nama', (req, res) => {
